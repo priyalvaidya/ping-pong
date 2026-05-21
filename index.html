@@ -310,22 +310,33 @@ const sfx={
   conn:()=>[660,880,1100].forEach((f,i)=>setTimeout(()=>tone(f,'sine',.12,.18),i*80)),
 };
 
-// ── RANKS ──
+// ── RANKS (MMR-based ranges, derank enabled) ──
 const RANKS=[
-  {n:'ROOKIE',     ic:'🥉',col:'#cd7f32',min:0,  max:4},
-  {n:'CONTENDER',  ic:'🥈',col:'#aaaaaa',min:5,  max:9},
-  {n:'WARRIOR',    ic:'⚔️', col:'#4488ff',min:10, max:19},
-  {n:'CHAMPION',   ic:'🏆',col:'#ffd700',min:20, max:34},
-  {n:'CYBER ACE',  ic:'♠️', col:'#ff8800',min:35, max:49},
-  {n:'MASTER',     ic:'👑',col:'#aa44ff',min:50, max:74},
-  {n:'GRANDMASTER',ic:'⚡',col:'#00f5ff',min:75, max:99},
-  {n:'LEGEND',     ic:'🌟',col:'#ff44ff',min:100,max:149},
-  {n:'MYTHIC',     ic:'🔥',col:'#ff6600',min:150,max:199},
-  {n:'NEON GOD',   ic:'💀',col:'#ffffff',min:200,max:Infinity},
+  {n:'ROOKIE',     ic:'🥉',col:'#cd7f32',min:0,   max:1099},
+  {n:'CONTENDER',  ic:'🥈',col:'#aaaaaa',min:1100,max:1299},
+  {n:'WARRIOR',    ic:'⚔️', col:'#4488ff',min:1300,max:1499},
+  {n:'CHAMPION',   ic:'🏆',col:'#ffd700',min:1500,max:1749},
+  {n:'CYBER ACE',  ic:'♠️', col:'#ff8800',min:1750,max:1999},
+  {n:'MASTER',     ic:'👑',col:'#aa44ff',min:2000,max:2299},
+  {n:'GRANDMASTER',ic:'⚡',col:'#00f5ff',min:2300,max:2699},
+  {n:'LEGEND',     ic:'🌟',col:'#ff44ff',min:2700,max:3099},
+  {n:'MYTHIC',     ic:'🔥',col:'#ff6600',min:3100,max:3599},
+  {n:'NEON GOD',   ic:'💀',col:'#ffffff',min:3600,max:Infinity},
 ];
-const getRank=w=>RANKS.find(r=>w>=r.min&&w<=r.max)||RANKS[0];
-const getNext=w=>{const i=RANKS.findIndex(r=>w>=r.min&&w<=r.max);return RANKS[i+1]||null;};
-const rankProg=w=>{const r=getRank(w);return r.max===Infinity?1:(w-r.min)/(r.max-r.min+1);};
+const getRank=mmr=>RANKS.find(r=>mmr>=r.min&&mmr<=r.max)||RANKS[0];
+const getNext=mmr=>{const i=RANKS.findIndex(r=>mmr>=r.min&&mmr<=r.max);return RANKS[i+1]||null;};
+const rankProg=mmr=>{const r=getRank(mmr);return r.max===Infinity?1:(mmr-r.min)/(r.max-r.min+1);};
+
+// ── DUMMY OPPONENT NAMES for Ranked ──
+const DUMMY_PREFIXES=['xX','_','Pro','Dark','Neon','Cyber','Ultra','Ghost','Shadow','Hyper','Void','Delta','Nova','Apex','Storm'];
+const DUMMY_MIDS=['Pong','Blade','Strike','Paddle','Ace','Spike','Rekt','Smash','Clutch','Viper','Specter','Ranger','Wolf','Fox'];
+const DUMMY_SUFFIXES=['_99','420','xX','_','777','gg','HD','Pro','2K','lol','YT','TV','EU','NA'];
+function randDummyName(){
+  const p=DUMMY_PREFIXES[Math.floor(Math.random()*DUMMY_PREFIXES.length)];
+  const m=DUMMY_MIDS[Math.floor(Math.random()*DUMMY_MIDS.length)];
+  const s=Math.random()<0.6?DUMMY_SUFFIXES[Math.floor(Math.random()*DUMMY_SUFFIXES.length)]:'';
+  return p+m+s;
+}
 
 // ── PLAYER ABILITIES ──
 const PABS=[
@@ -383,6 +394,8 @@ const OPP=[
 const sv=(k,v)=>{try{localStorage.setItem('np_'+k,JSON.stringify(v));}catch(e){}};
 const ld=(k,d)=>{try{const v=localStorage.getItem('np_'+k);return v!==null?JSON.parse(v):d;}catch(e){return d;}};
 let cDef=ld('def',[]),cProg=ld('prog',0),rWins=ld('rw',0),rLoss=ld('rl',0),rMMR=ld('mmr',1000);
+// Ranked opponent: a fake player with a dummy name, difficulty scaled to MMR
+let rankedOppName='';
 function saveAll(){sv('def',cDef);sv('prog',cProg);sv('rw',rWins);sv('rl',rLoss);sv('mmr',rMMR);showToast();}
 function resetProgress(){if(!confirm('Reset ALL progress? Cannot undo.'))return;cDef=[];cProg=0;rWins=0;rLoss=0;rMMR=1000;['def','prog','rw','rl','mmr'].forEach(k=>localStorage.removeItem('np_'+k));updateMenuUI();showToast('PROGRESS RESET');}
 
@@ -522,7 +535,7 @@ function tickAbs(){
 
 // ── MENU UI ──
 function updateMenuUI(){
-  const r=getRank(rWins);
+  const r=getRank(rMMR);
   document.getElementById('menu-rank').innerHTML=`<span style="font-size:18px">${r.ic}</span><span style="color:${r.col};font-size:10px;letter-spacing:3px">${r.n}</span><span style="font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 10px;border:1px solid ${r.col}33;border-radius:2px;color:var(--c)">⚡ ${rMMR} MMR</span><span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#ffffff33;letter-spacing:2px">${rWins}W ${rLoss}L</span>`;
   document.getElementById('menu-rank').style.cssText+=`;border-color:${r.col}44;background:${r.col}09`;
   document.getElementById('career-tag').textContent=`${cDef.length} / 16 DEFEATED`;
@@ -568,24 +581,38 @@ function selOpp(id){
 
 // ── RANKED UI ──
 function updateRkUI(){
-  const r=getRank(rWins),nx=getNext(rWins),p=rankProg(rWins);
-  const prev=OPP.reduce((a,b)=>Math.abs(b.mmr-rMMR)<Math.abs(a.mmr-rMMR)?b:a);
+  const r=getRank(rMMR),nx=getNext(rMMR),p=rankProg(rMMR);
+  // Build a fake "next opponent" based on MMR ±100
+  const oppMmr=rMMR+Math.round(rand(-80,80));
+  const oppName=randDummyName();
   document.getElementById('rk-display').innerHTML=`
     <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:#ffffff22">CURRENT RANK</div>
     <div class="rk-icon">${r.ic}</div>
     <div class="rk-name" style="color:${r.col};text-shadow:0 0 22px ${r.col}55">${r.n}</div>
-    <div class="mmr-big" style="color:var(--c);text-shadow:var(--sc);margin:5px 0">${rMMR} <span style="font-size:14px;color:#ffffff33">MMR</span></div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#ffffff28;letter-spacing:2px;margin-top:2px">${r.min} – ${r.max===Infinity?'∞':r.max} MMR</div>
+    <div class="mmr-big" style="color:var(--c);text-shadow:var(--sc);margin:6px 0">${rMMR} <span style="font-size:14px;color:#ffffff33">MMR</span></div>
     <div class="rk-stats">${rWins}W · ${rLoss}L · ${rWins+rLoss>0?Math.round(rWins/(rWins+rLoss)*100):0}% WIN RATE</div>
-    ${nx?`<div class="rk-bar"><div class="rk-fill" style="width:${Math.round(p*100)}%;background:${r.col}"></div></div><div class="rk-next">NEXT: ${nx.ic} ${nx.n} AT ${nx.min} WINS</div>`:''}
+    ${nx?`<div class="rk-bar" style="margin-top:8px"><div class="rk-fill" style="width:${Math.round(p*100)}%;background:${r.col}"></div></div><div class="rk-next">NEXT: ${nx.ic} ${nx.n} AT ${nx.min} MMR</div>`:'<div class="rk-next" style="color:#ffd700">⚡ MAX RANK ACHIEVED</div>'}
     <div style="margin-top:12px;padding:10px 16px;border:1px solid rgba(255,255,255,.07);border-radius:3px;background:rgba(255,255,255,.02);display:flex;align-items:center;gap:10px">
-      <span style="font-size:20px">${prev.em}</span>
-      <div style="text-align:left"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#ffffff33;letter-spacing:3px">LIKELY NEXT OPPONENT</div><div style="font-size:10px;font-weight:700;letter-spacing:3px;color:${prev.col}">${prev.name} · ${prev.mmr} MMR</div></div>
+      <span style="font-size:20px">🎮</span>
+      <div style="text-align:left"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#ffffff33;letter-spacing:3px">LIKELY NEXT OPPONENT</div><div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#ff006e">${oppName} · ${oppMmr} MMR</div></div>
     </div>`;
 }
 
 // ── MATCH SETUP ──
 function startCareer(id){ga();sfx.menu();mode='career';opp=OPP[id];carIdx=id;prevScreen='career';mySlots=[null,null];prep();show('game');}
-function startRanked(){ga();sfx.menu();mode='ranked';const s=[...OPP].sort((a,b)=>Math.abs(a.mmr-rMMR)-Math.abs(b.mmr-rMMR));opp=s[Math.floor(Math.random()*3)];mySlots=[null,null];prevScreen='ranked';prep();show('game');}
+function startRanked(){
+  ga();sfx.menu();mode='ranked';
+  // Pick a career opponent whose difficulty matches current MMR bracket
+  const s=[...OPP].sort((a,b)=>Math.abs(a.mmr-rMMR)-Math.abs(b.mmr-rMMR));
+  opp={...s[Math.floor(Math.random()*3)]};
+  // Override name with a dummy player name
+  rankedOppName=randDummyName();
+  opp.name=rankedOppName;
+  opp.tag='Ranked Opponent · '+rMMR+' MMR';
+  opp.col='#ff006e';
+  mySlots=[null,null];prevScreen='ranked';prep();show('game');
+}
 function startQuick(){ga();sfx.menu();mode='quick';opp=OPP[Math.floor(Math.random()*16)];mySlots=[null,null];prevScreen='menu';prep();show('game');}
 function prepMulti(){ga();mode='multi';opp=null;prevScreen='multi';prep();show('game');wsSend({type:'ready'});}
 
@@ -805,19 +832,39 @@ function endGame(win){
   running=false;cancelAnimationFrame(animId);clearInterval(stTmr);clearInterval(pdTmr);
   win?sfx.win():sfx.lose();shake.mag=win?5:18;
   let mmrD=0;
+  let rankChanged=''; // 'up', 'down', or ''
   if(mode==='career'&&win){if(!cDef.includes(carIdx))cDef.push(carIdx);if(carIdx>=cProg)cProg=Math.min(carIdx+1,16);saveAll();}
-  if(mode==='ranked'){if(win)rWins++;else rLoss++;const K=32,ex=1/(1+Math.pow(10,(opp.mmr-rMMR)/400));mmrD=Math.round(K*(win?1-ex:0-ex));rMMR=Math.max(100,rMMR+mmrD);saveAll();}
+  if(mode==='ranked'){
+    if(win)rWins++;else rLoss++;
+    const prevRank=getRank(rMMR);
+    const K=32,ex=1/(1+Math.pow(10,(opp.mmr-rMMR)/400));
+    mmrD=Math.round(K*(win?1-ex:0-ex));
+    rMMR=Math.max(100,rMMR+mmrD);
+    const newRank=getRank(rMMR);
+    if(newRank.min>prevRank.min)rankChanged='up';
+    else if(newRank.min<prevRank.min)rankChanged='down';
+    saveAll();
+  }
   const ot=document.getElementById('or-t'),os=document.getElementById('or-s'),osc=document.getElementById('or-sc'),oa=document.getElementById('or-acts');
   document.getElementById('ov-result').classList.add('show');
   ot.textContent=win?'VICTORY':'DEFEAT';ot.style.color=win?'var(--c)':'var(--p)';ot.style.textShadow=win?'var(--sc)':'var(--sp)';
   os.textContent=win?(mode==='multi'?'YOU WIN!':'YOU DEFEATED '+opp.name):(mode==='multi'?'OPPONENT WINS!':opp.name+' WINS');
   os.style.color='#ffffff33';osc.textContent=`${pscore}  —  ${ascore}`;
   let h='';
-  if(mode==='ranked'&&mmrD!==0){const cl=mmrD>0?'pos':'neg';h+=`<div class="mmr-d ${cl}" style="width:100%;text-align:center;margin-bottom:4px">⚡ ${rMMR} MMR (${mmrD>0?'+':''}${mmrD})</div>`;}
+  if(mode==='ranked'){
+    const rk=getRank(rMMR);
+    if(rankChanged==='up'){
+      h+=`<div style="font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:3px;color:${rk.col};text-shadow:0 0 18px ${rk.col}88;padding:6px 0;animation:pulse 1s ease-in-out 3">${rk.ic} RANK UP! → ${rk.n}</div>`;
+      flash(rk.col);
+    } else if(rankChanged==='down'){
+      h+=`<div style="font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:3px;color:#ff006e;padding:6px 0">↓ RANK DOWN → ${rk.n}</div>`;
+    }
+    if(mmrD!==0){const cl=mmrD>0?'pos':'neg';h+=`<div class="mmr-d ${cl}" style="width:100%;text-align:center;margin-bottom:4px">⚡ ${rMMR} MMR (${mmrD>0?'+':''}${mmrD})</div>`;}
+    h+=`<button class="btn bg blg" onclick="startRanked()">↺ REMATCH</button><span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:${rk.col};letter-spacing:3px">${rk.ic} ${rk.n}</span>`;
+  }
   if(mode==='career'){if(win&&cProg<OPP.length)h+=`<button class="btn bc blg" onclick="startCareer(${cProg})">NEXT ▶</button>`;h+=`<button class="btn bgh" onclick="prep()">↺ RETRY</button><button class="btn bgh" onclick="showCareer()">↩ ROSTER</button>`;}
-  else if(mode==='ranked'){const rk=getRank(rWins);h+=`<button class="btn bg blg" onclick="startRanked()">↺ REMATCH</button><span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:${rk.col};letter-spacing:3px">${rk.ic} ${rk.n}</span>`;}
   else if(mode==='multi'){h+=`<button class="btn bpu blg" onclick="prepMulti()">↺ REMATCH</button><button class="btn bgh" onclick="sendTaunt()">💬 TAUNT</button>`;}
-  else h+=`<button class="btn bp blg" onclick="startQuick()">↺ REMATCH</button>`;
+  else if(mode==='quick')h+=`<button class="btn bp blg" onclick="startQuick()">↺ REMATCH</button>`;
   h+=`<button class="btn bgh" onclick="showMenu()">↩ MENU</button>`;
   oa.innerHTML=h;
 }
