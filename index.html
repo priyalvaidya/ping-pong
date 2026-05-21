@@ -584,13 +584,13 @@ function prep(){
     document.getElementById('ai-sub').textContent='ONLINE PLAYER';
     document.getElementById('ov-st').textContent='OPPONENT FOUND!';
     document.getElementById('ov-st').style.color='var(--pu)';
-    document.getElementById('ov-ss').textContent='MOVE YOUR MOUSE · Q AND E TO USE ABILITIES · T TO TAUNT';
+    document.getElementById('ov-ss').textContent=(isMobile?'USE JOYSTICK TO MOVE · ':'MOVE YOUR MOUSE · ')+'Q AND E TO USE ABILITIES · T TO TAUNT';
     document.getElementById('ov-sa').textContent=`YOUR ABILITIES: ${mySlots[0]?.n||'—'} (Q) · ${mySlots[1]?.n||'—'} (E)`;
     document.getElementById('ov-sa').style.cssText='color:var(--pu);border-color:#bf5fff44;background:#bf5fff09';
     renderAbBar();document.getElementById('ab-bar').style.display='flex';
   }else{
     document.getElementById('g-p1n').textContent='YOU';document.getElementById('g-p1n').style.color='var(--c)';
-    document.getElementById('g-p1s').textContent='MOUSE CONTROL';
+    document.getElementById('g-p1s').textContent=isMobile?'JOYSTICK CONTROL':'MOUSE CONTROL';
     document.getElementById('ai-name').textContent=opp?.name||'CPU';document.getElementById('ai-name').style.color=opp?.col||'var(--p)';
     document.getElementById('ai-sub').textContent=opp?.aname||'';document.getElementById('ai-sub').style.color=(opp?.col||'var(--p)')+'99';
     document.getElementById('ov-st').textContent=`VS ${opp?.name||'CPU'}`;document.getElementById('ov-st').style.color=opp?.col||'var(--p)';
@@ -791,44 +791,144 @@ document.addEventListener('keydown',e=>{
   if(e.code==='KeyT'&&mode==='multi')sendTaunt();
 });
 
-// ── TOUCH / PHONE CONTROLS ──
-// Track touch anywhere on screen and map to canvas Y
-let touchActive=false;
-function handleTouch(e){
-  e.preventDefault();
-  const t=e.touches[0];
-  if(!t)return;
-  const r=cv.getBoundingClientRect();
-  mouseY=(t.clientY-r.top)*(H/r.height);
-  mouseY=Math.max(0,Math.min(H,mouseY));
-  touchActive=true;
-}
-document.addEventListener('touchstart',handleTouch,{passive:false});
-document.addEventListener('touchmove',handleTouch,{passive:false});
-document.addEventListener('touchend',()=>{touchActive=false;},{passive:false});
+// ── TOUCH / PHONE CONTROLS — VIRTUAL JOYSTICK (mobile only) ──
+const isMobile='ontouchstart' in window||navigator.maxTouchPoints>0;
 
-// On mobile, hide cursor and show touch UI
-if('ontouchstart' in window){
+if(isMobile){
   document.getElementById('cursor').style.display='none';
   document.body.style.cursor='none';
-  // Inject mobile ability buttons
+
+  // ── Joystick state ──
+  let joyActive=false,joyId=null;
+  let joyBaseX=0,joyBaseY=0,joyDx=0,joyDy=0;
+  const JOY_MAX=52; // max drag radius in px
+
+  // ── Build joystick UI ──
+  const joyWrap=document.createElement('div');
+  joyWrap.id='joy-wrap';
+  joyWrap.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9100;display:none;flex-direction:column;align-items:center;gap:6px;pointer-events:none;touch-action:none;';
+
+  // Base ring
+  const joyBase=document.createElement('div');
+  joyBase.id='joy-base';
+  joyBase.style.cssText=`width:110px;height:110px;border-radius:50%;border:2px solid rgba(0,245,255,.35);background:rgba(0,245,255,.05);box-shadow:0 0 18px rgba(0,245,255,.15);position:relative;pointer-events:all;touch-action:none;`;
+
+  // Knob
+  const joyKnob=document.createElement('div');
+  joyKnob.id='joy-knob';
+  joyKnob.style.cssText='width:44px;height:44px;border-radius:50%;background:rgba(0,245,255,.25);border:2px solid var(--c);box-shadow:0 0 14px rgba(0,245,255,.55);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:none;pointer-events:none;';
+
+  // Label
+  const joyLbl=document.createElement('div');
+  joyLbl.style.cssText="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,245,255,.35);letter-spacing:2px;text-align:center;pointer-events:none;";
+  joyLbl.textContent='MOVE';
+
+  joyBase.appendChild(joyKnob);
+  joyWrap.appendChild(joyBase);
+  joyWrap.appendChild(joyLbl);
+
+  // ── Ability buttons ──
   const mobileBar=document.createElement('div');
   mobileBar.id='mobile-btns';
-  mobileBar.style.cssText='position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;padding:14px 18px 24px;z-index:9000;pointer-events:none;';
+  mobileBar.style.cssText='position:fixed;bottom:0;left:0;right:0;display:none;justify-content:space-between;align-items:flex-end;padding:10px 16px 20px;z-index:9000;pointer-events:none;';
   mobileBar.innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:10px;pointer-events:all">
-      <button ontouchstart="useAb(0);return false;" style="font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 22px;border:2px solid var(--c);color:var(--c);background:rgba(0,245,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent">Q<br><span style="font-size:8px;opacity:.6">ABILITY 1</span></button>
+    <div style="display:flex;flex-direction:column;gap:8px;pointer-events:all">
+      <button id="ab-btn-0" ontouchstart="useAb(0);return false;" style="font-family:Orbitron,monospace;font-size:10px;font-weight:700;letter-spacing:2px;padding:13px 18px;border:2px solid var(--c);color:var(--c);background:rgba(0,245,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent;min-width:72px;text-align:center">Q<br><span style="font-size:7px;opacity:.6">ABILITY 1</span></button>
     </div>
-    <div style="font-family:Share Tech Mono,monospace;font-size:9px;color:#ffffff22;letter-spacing:2px;text-align:center;align-self:center">DRAG ANYWHERE<br>TO MOVE PADDLE</div>
-    <div style="display:flex;flex-direction:column;gap:10px;pointer-events:all">
-      <button ontouchstart="useAb(1);return false;" style="font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 22px;border:2px solid var(--pu);color:var(--pu);background:rgba(191,95,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent">E<br><span style="font-size:8px;opacity:.6">ABILITY 2</span></button>
+    <div style="pointer-events:none;width:130px"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;pointer-events:all">
+      <button id="ab-btn-1" ontouchstart="useAb(1);return false;" style="font-family:Orbitron,monospace;font-size:10px;font-weight:700;letter-spacing:2px;padding:13px 18px;border:2px solid var(--pu);color:var(--pu);background:rgba(191,95,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent;min-width:72px;text-align:center">E<br><span style="font-size:7px;opacity:.6">ABILITY 2</span></button>
     </div>
   `;
   document.body.appendChild(mobileBar);
-  // Show/hide mobile bar based on game screen
+  document.body.appendChild(joyWrap);
+
+  // ── Joystick touch handlers ──
+  function joyStart(e){
+    // Only handle touches that begin inside the joystick base
+    const touches=[...e.changedTouches];
+    for(const t of touches){
+      const r=joyBase.getBoundingClientRect();
+      const cx2=r.left+r.width/2,cy2=r.top+r.height/2;
+      const dx=t.clientX-cx2,dy=t.clientY-cy2;
+      if(Math.hypot(dx,dy)<r.width/2+10){
+        e.preventDefault();
+        joyActive=true;joyId=t.identifier;
+        joyBaseX=cx2;joyBaseY=cy2;
+        joyDx=0;joyDy=0;
+        joyKnob.style.transform='translate(-50%,-50%)';
+        return;
+      }
+    }
+  }
+  function joyMove(e){
+    if(!joyActive)return;
+    e.preventDefault();
+    const touches=[...e.changedTouches];
+    for(const t of touches){
+      if(t.identifier!==joyId)continue;
+      const dx=t.clientX-joyBaseX;
+      const dy=t.clientY-joyBaseY;
+      const dist=Math.min(Math.hypot(dx,dy),JOY_MAX);
+      const ang=Math.atan2(dy,dx);
+      joyDx=Math.cos(ang)*dist;
+      joyDy=Math.sin(ang)*dist;
+      // Move knob visually
+      joyKnob.style.transform=`translate(calc(-50% + ${joyDx}px), calc(-50% + ${joyDy}px))`;
+    }
+  }
+  function joyEnd(e){
+    const touches=[...e.changedTouches];
+    for(const t of touches){
+      if(t.identifier===joyId){
+        joyActive=false;joyId=null;joyDx=0;joyDy=0;
+        joyKnob.style.transform='translate(-50%,-50%)';
+        break;
+      }
+    }
+  }
+
+  joyBase.addEventListener('touchstart',joyStart,{passive:false});
+  document.addEventListener('touchmove',joyMove,{passive:false});
+  document.addEventListener('touchend',joyEnd,{passive:false});
+  document.addEventListener('touchcancel',joyEnd,{passive:false});
+
+  // ── Apply joystick delta to paddle each frame ──
+  // Override the paddle update: instead of snapping to touchY, we move by joystick Y delta
+  const JOY_SPEED=10; // paddle px per frame at full deflection
+  const _origUpdate=window.update;
+  // We'll hook into the game loop by patching mouseY each frame via a separate RAF
+  // Actually we patch it directly inside the existing update() via a wrapper
+  const _baseUpdate=update;
+  window.update=function(){
+    if(joyActive&&running&&!paused){
+      const norm=joyDy/JOY_MAX; // -1 (up) to +1 (down)
+      // Move mouseY (which maps to paddle center) by joystick speed
+      mouseY=clamp(mouseY+norm*JOY_SPEED,0,H);
+    }
+    _baseUpdate();
+  };
+
+  // ── Show/hide mobile UI with game screen ──
   const origShow=window.show;
-  window.show=function(id){origShow(id);mobileBar.style.display=(id==='game')?'flex':'none';};
+  window.show=function(id){
+    origShow(id);
+    const inGame=(id==='game');
+    mobileBar.style.display=inGame?'flex':'none';
+    joyWrap.style.display=inGame?'flex':'none';
+  };
   mobileBar.style.display='none';
+  joyWrap.style.display='none';
+
+  // ── Update ability button labels when abilities are assigned ──
+  const _origRenderAbBar=window.renderAbBar;
+  window.renderAbBar=function(){
+    _origRenderAbBar();
+    const b0=document.getElementById('ab-btn-0');
+    const b1=document.getElementById('ab-btn-1');
+    if(b0&&mySlots[0])b0.innerHTML=`${mySlots[0].ic}<br><span style="font-size:7px;opacity:.8;letter-spacing:1px">${mySlots[0].n}</span>`;
+    if(b1&&mySlots[1])b1.innerHTML=`${mySlots[1].ic}<br><span style="font-size:7px;opacity:.8;letter-spacing:1px">${mySlots[1].n}</span>`;
+  };
 }
 
 // ── INIT ──
