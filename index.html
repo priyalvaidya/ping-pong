@@ -98,7 +98,19 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .gcw{position:relative;border:1px solid rgba(0,245,255,.12);box-shadow:0 0 28px rgba(0,245,255,.06),inset 0 0 50px rgba(0,0,0,.4);border-radius:3px;overflow:hidden}
 .gcw::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent);z-index:10;pointer-events:none}
 .gcw::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--p),transparent);z-index:10;pointer-events:none}
-#gc,#pc{display:block}
+#gc,#pc{display:block;max-width:100%;touch-action:none;}
+#s-game{transform-origin:top center;}
+.gcw{max-width:100vw;}
+@media(max-width:860px){
+  #s-game{transform:scale(0.78);margin-top:-70px;}
+  .gh,.gfoot,.ab-bar{width:100%!important;max-width:800px;}
+}
+@media(max-width:600px){
+  #s-game{transform:scale(0.52);margin-top:-160px;}
+}
+@media(max-width:400px){
+  #s-game{transform:scale(0.40);margin-top:-210px;}
+}
 #s-game{transform-origin:top center;}
 @media(max-width:860px){#s-game{transform:scale(0.75);margin-top:-80px;}}
 @media(max-width:640px){#s-game{transform:scale(0.55);margin-top:-160px;}}
@@ -762,15 +774,62 @@ let tTO=null;
 function showToast(msg='💾 PROGRESS SAVED'){const e=document.getElementById('save-toast');e.textContent=msg;e.classList.add('show');if(tTO)clearTimeout(tTO);tTO=setTimeout(()=>e.classList.remove('show'),2200);}
 
 // ── INPUT ──
-cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();mouseY=e.clientY-r.top;});
-document.addEventListener('mousemove',e=>{const c=document.getElementById('cursor');c.style.left=e.clientX+'px';c.style.top=e.clientY+'px';});
+// Mouse: track on entire document so cursor leaving canvas doesn't stop paddle
+document.addEventListener('mousemove',e=>{
+  const c=document.getElementById('cursor');
+  c.style.left=e.clientX+'px';c.style.top=e.clientY+'px';
+  const r=cv.getBoundingClientRect();
+  // Map mouse Y relative to canvas, clamped so paddle never gets stuck
+  mouseY=(e.clientY-r.top)*(H/r.height);
+  mouseY=Math.max(0,Math.min(H,mouseY));
+});
+
 document.addEventListener('keydown',e=>{
   if(e.code==='Space'||e.code==='KeyP'){e.preventDefault();if(running||paused)togglePause();}
   if(e.code==='KeyQ')useAb(0);
   if(e.code==='KeyE')useAb(1);
   if(e.code==='KeyT'&&mode==='multi')sendTaunt();
 });
-cv.addEventListener('touchmove',e=>{e.preventDefault();const r=cv.getBoundingClientRect();mouseY=(e.touches[0].clientY-r.top)*(H/r.height);},{passive:false});
+
+// ── TOUCH / PHONE CONTROLS ──
+// Track touch anywhere on screen and map to canvas Y
+let touchActive=false;
+function handleTouch(e){
+  e.preventDefault();
+  const t=e.touches[0];
+  if(!t)return;
+  const r=cv.getBoundingClientRect();
+  mouseY=(t.clientY-r.top)*(H/r.height);
+  mouseY=Math.max(0,Math.min(H,mouseY));
+  touchActive=true;
+}
+document.addEventListener('touchstart',handleTouch,{passive:false});
+document.addEventListener('touchmove',handleTouch,{passive:false});
+document.addEventListener('touchend',()=>{touchActive=false;},{passive:false});
+
+// On mobile, hide cursor and show touch UI
+if('ontouchstart' in window){
+  document.getElementById('cursor').style.display='none';
+  document.body.style.cursor='none';
+  // Inject mobile ability buttons
+  const mobileBar=document.createElement('div');
+  mobileBar.id='mobile-btns';
+  mobileBar.style.cssText='position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;padding:14px 18px 24px;z-index:9000;pointer-events:none;';
+  mobileBar.innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:10px;pointer-events:all">
+      <button ontouchstart="useAb(0);return false;" style="font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 22px;border:2px solid var(--c);color:var(--c);background:rgba(0,245,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent">Q<br><span style="font-size:8px;opacity:.6">ABILITY 1</span></button>
+    </div>
+    <div style="font-family:Share Tech Mono,monospace;font-size:9px;color:#ffffff22;letter-spacing:2px;text-align:center;align-self:center">DRAG ANYWHERE<br>TO MOVE PADDLE</div>
+    <div style="display:flex;flex-direction:column;gap:10px;pointer-events:all">
+      <button ontouchstart="useAb(1);return false;" style="font-family:Orbitron,monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 22px;border:2px solid var(--pu);color:var(--pu);background:rgba(191,95,255,.1);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent">E<br><span style="font-size:8px;opacity:.6">ABILITY 2</span></button>
+    </div>
+  `;
+  document.body.appendChild(mobileBar);
+  // Show/hide mobile bar based on game screen
+  const origShow=window.show;
+  window.show=function(id){origShow(id);mobileBar.style.display=(id==='game')?'flex':'none';};
+  mobileBar.style.display='none';
+}
 
 // ── INIT ──
 updateMenuUI();
