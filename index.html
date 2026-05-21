@@ -99,6 +99,9 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .gcw::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent);z-index:10;pointer-events:none}
 .gcw::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--p),transparent);z-index:10;pointer-events:none}
 #gc,#pc{display:block}
+#s-game{transform-origin:top center;}
+@media(max-width:860px){#s-game{transform:scale(0.75);margin-top:-80px;}}
+@media(max-width:640px){#s-game{transform:scale(0.55);margin-top:-160px;}}
 #pc{position:absolute;top:0;left:0;pointer-events:none;z-index:5}
 .gfoot{display:flex;width:800px;justify-content:space-between;align-items:center}
 .combo{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--g);text-shadow:0 0 8px var(--g);letter-spacing:2px;height:16px}
@@ -556,7 +559,7 @@ function updateRkUI(){
 function startCareer(id){ga();sfx.menu();mode='career';opp=OPP[id];carIdx=id;prevScreen='career';mySlots=[null,null];prep();show('game');}
 function startRanked(){ga();sfx.menu();mode='ranked';const s=[...OPP].sort((a,b)=>Math.abs(a.mmr-rMMR)-Math.abs(b.mmr-rMMR));opp=s[Math.floor(Math.random()*3)];mySlots=[null,null];prevScreen='ranked';prep();show('game');}
 function startQuick(){ga();sfx.menu();mode='quick';opp=OPP[Math.floor(Math.random()*16)];mySlots=[null,null];prevScreen='menu';prep();show('game');}
-function prepMulti(){ga();mode='multi';opp=null;prevScreen='multi';prep();wsSend({type:'ready'});}
+function prepMulti(){ga();mode='multi';opp=null;prevScreen='multi';prep();show('game');wsSend({type:'ready'});}
 
 function prep(){
   if(mode==='multi'){
