@@ -1,128 +1,103 @@
-const WebSocket = require('ws');
 const http = require('http');
+const { WebSocketServer } = require('ws');
 
+const PORT = process.env.PORT || 3000;
+
+// ── Rooms store ──
+const rooms = {};
+
+function makeCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+// ── HTTP server (handles both HTTP and WS upgrades) ──
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'NEON PONG Server Online', rooms: rooms.size }));
+  res.end(JSON.stringify({ status: 'NEON PONG Server Online', rooms: Object.keys(rooms).length }));
 });
 
-const wss = new WebSocket.Server({ server });
-const rooms = new Map();
-
-const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function genCode() {
-  let c = '';
-  for (let i = 0; i < 6; i++) c += CHARS[Math.floor(Math.random() * CHARS.length)];
-  return c;
-}
-
-function send(ws, data) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    try { ws.send(JSON.stringify(data)); } catch (e) {}
-  }
-}
-
-function cleanupRoom(code) {
-  const room = rooms.get(code);
-  if (!room) return;
-  send(room.host, { type: 'disconnect' });
-  send(room.guest, { type: 'disconnect' });
-  rooms.delete(code);
-  console.log(`Room ${code} closed. Active: ${rooms.size}`);
-}
+// ── WebSocket server attached to same HTTP server ──
+const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
-  let myRoom = null, myRole = null;
+  ws.roomCode = null;
+  ws.role = null;
 
   ws.on('message', (raw) => {
     let msg;
-    try { msg = JSON.parse(raw); } catch (e) { return; }
+    try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
+
       case 'create': {
-        let code, attempts = 0;
-        do { code = genCode(); attempts++; } while (rooms.has(code) && attempts < 100);
-        rooms.set(code, { host: ws, guest: null, host_ready: false, guest_ready: false });
-        myRoom = code; myRole = 'host';
-        send(ws, { type: 'created', code });
-        console.log(`Room created: ${code}. Active: ${rooms.size}`);
+        let code;
+        do { code = makeCode(); } while (rooms[code]);
+        rooms[code] = { host: ws, guest: null };
+        ws.roomCode = code;
+        ws.role = 'host';
+        ws.send(JSON.stringify({ type: 'created', code }));
         break;
       }
+
       case 'join': {
-        const code = String(msg.code || '').toUpperCase().trim();
-        const room = rooms.get(code);
-        if (!room) { send(ws, { type: 'error', msg: 'Room not found. Check the code.' }); return; }
-        if (room.guest) { send(ws, { type: 'error', msg: 'Room is full.' }); return; }
-        room.guest = ws; myRoom = code; myRole = 'guest';
-        send(room.host, { type: 'matched', role: 'host' });
-        send(ws, { type: 'matched', role: 'guest' });
-        console.log(`Room ${code} matched!`);
-        break;
-      }
-      case 'ready': {
-        const room = rooms.get(myRoom);
-        if (!room) return;
-        room[myRole + '_ready'] = true;
-        if (room.host_ready && room.guest_ready) {
-          send(room.host, { type: 'go' });
-          send(room.guest, { type: 'go' });
+        const code = (msg.code || '').toUpperCase();
+        const room = rooms[code];
+        if (!room) {
+          ws.send(JSON.stringify({ type: 'error', msg: 'Room not found' }));
+          break;
         }
+        if (room.guest) {
+          ws.send(JSON.stringify({ type: 'error', msg: 'Room is full' }));
+          break;
+        }
+        room.guest = ws;
+        ws.roomCode = code;
+        ws.role = 'guest';
+        // Tell both players they matched
+        room.host.send(JSON.stringify({ type: 'matched', role: 'host' }));
+        room.guest.send(JSON.stringify({ type: 'matched', role: 'guest' }));
+        // Signal game start after short delay
+        setTimeout(() => {
+          if (room.host.readyState === 1) room.host.send(JSON.stringify({ type: 'go' }));
+          if (room.guest.readyState === 1) room.guest.send(JSON.stringify({ type: 'go' }));
+        }, 800);
         break;
       }
-      case 'paddle': {
-        const room = rooms.get(myRoom);
-        if (!room) return;
-        send(myRole === 'host' ? room.guest : room.host, { type: 'paddle', y: msg.y });
-        break;
-      }
-      case 'state': {
-        const room = rooms.get(myRoom);
-        if (!room || myRole !== 'host') return;
-        send(room.guest, { type: 'state', bx: msg.bx, by: msg.by, bvx: msg.bvx, bvy: msg.bvy, ps: msg.ps, as: msg.as });
-        break;
-      }
-      case 'ability': {
-        const room = rooms.get(myRoom);
-        if (!room) return;
-        const payload = { type: 'ability', id: msg.id, who: myRole };
-        send(myRole === 'host' ? room.guest : room.host, payload);
-        send(ws, payload);
-        break;
-      }
-      case 'score': {
-        const room = rooms.get(myRoom);
-        if (!room || myRole !== 'host') return;
-        send(room.guest, { type: 'score', ps: msg.ps, as: msg.as });
-        break;
-      }
-      case 'gameover': {
-        const room = rooms.get(myRoom);
-        if (!room) return;
-        send(myRole === 'host' ? room.guest : room.host, { type: 'gameover', winner: msg.winner });
-        break;
-      }
+
+      case 'paddle':
+      case 'state':
+      case 'ability':
+      case 'gameover':
       case 'taunt': {
-        const room = rooms.get(myRoom);
-        if (!room) return;
-        send(myRole === 'host' ? room.guest : room.host, { type: 'taunt', msg: msg.msg });
+        // Relay to the other player in the room
+        const room = rooms[ws.roomCode];
+        if (!room) break;
+        const other = ws.role === 'host' ? room.guest : room.host;
+        if (other && other.readyState === 1) other.send(JSON.stringify(msg));
         break;
       }
-      case 'ping':
-        send(ws, { type: 'pong', t: msg.t });
+
+      case 'ping': {
+        ws.send(JSON.stringify({ type: 'pong', t: msg.t }));
         break;
+      }
     }
   });
 
-  ws.on('close', () => { if (myRoom) cleanupRoom(myRoom); });
-  ws.on('error', () => { if (myRoom) cleanupRoom(myRoom); });
+  ws.on('close', () => {
+    const code = ws.roomCode;
+    if (!code || !rooms[code]) return;
+    const room = rooms[code];
+    const other = ws.role === 'host' ? room.guest : room.host;
+    if (other && other.readyState === 1) {
+      other.send(JSON.stringify({ type: 'disconnect' }));
+    }
+    delete rooms[code];
+  });
+
+  ws.on('error', () => {});
 });
 
-// Cleanup stale rooms every 5 minutes
-setInterval(() => {
-  rooms.forEach((room, code) => {
-    if (!room.host || room.host.readyState !== WebSocket.OPEN) cleanupRoom(code);
-  });
-}, 5 * 60 * 1000);
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`NEON PONG server on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`NEON PONG server running on port ${PORT}`);
+});
