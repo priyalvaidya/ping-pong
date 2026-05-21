@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon Pong</title>
+<title>NEON PONG — Cyber Arena</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 :root{--c:#00f5ff;--p:#ff006e;--g:#ffd700;--gr:#39ff14;--pu:#bf5fff;--bg:#030712;--gc:rgba(0,245,255,0.038);--sc:0 0 8px #00f5ff,0 0 22px #00f5ff44;--sp:0 0 8px #ff006e,0 0 22px #ff006e44;--sg:0 0 8px #ffd700,0 0 22px #ffd70044}
@@ -342,24 +342,33 @@ const OPP=[
   {id:0,name:'GLITCH',tag:'The Broken One',em:'🔧',col:'#00ccff',story:'A malfunctioning training bot that stutters and freezes unpredictably.',aname:'SYSTEM STUTTER',adesc:'Randomly freezes every 3s',diff:{spd:3.0,react:.52,ph:85},
    ability(){if(frame%180<18)aiSt.frozen=true;else aiSt.frozen=false;}},
   {id:1,name:'TITAN',tag:'The Immovable Wall',em:'🦣',col:'#ff4444',story:'Enormous paddle, barely moves. Target the corners to score.',aname:'COLOSSAL FORM',adesc:'Giant 165px paddle, barely moves',diff:{spd:1.7,react:.38,ph:165},ability(){}},
-  {id:2,name:'VIPER',tag:'The Angle Master',em:'🐍',col:'#aaff00',story:'Every return is an impossible angle. Stay alert.',aname:'VENOM SPIN',adesc:'Extreme spin on every return',diff:{spd:4.0,react:.65,ph:78},ability(){aiSt.spinMult=1.8;}},
+  {id:2,name:'VIPER',tag:'The Angle Master',em:'🐍',col:'#aaff00',story:'Every return is an impossible angle. Stay alert.',aname:'VENOM SPIN',adesc:'Extreme spin on every return — ball curves sharply',diff:{spd:4.0,react:.65,ph:78},
+   // spinMult amplifies vy in bounce(), aiSt.spinMult is read there
+   ability(){aiSt.spinMult=2.2;}},
   {id:3,name:'SURGE',tag:'The Accelerator',em:'⚡',col:'#ff8800',story:'Ball speeds up every 5 seconds. End rallies fast.',aname:'POWER SURGE',adesc:'Ball accelerates every 5 seconds',diff:{spd:4.2,react:.62,ph:80},
-   ability(){if(frame>60&&frame%300===0){const s=Math.hypot(ball.vx,ball.vy);if(s<19){ball.vx*=1.14;ball.vy*=1.14;showAlert('⚡ SURGE!',opp.col);}}}},
-  {id:4,name:'PHANTOM',tag:'The Teleporter',em:'👻',col:'#bf5fff',story:'Teleports its paddle to meet the ball every 8 seconds.',aname:'GHOST STEP',adesc:'Teleports to the ball every 8 seconds',diff:{spd:3.8,react:.60,ph:80},
-   ability(){if(frame>60&&frame%480===0&&ball.vx>0){ai.y=clamp(ball.y-ai.h/2,0,H-ai.h);burst(ai.x+ai.w/2,ai.y+ai.h/2,opp.col,18);sfx.tel();showAlert('👻 TELEPORT!',opp.col);}}},
-  {id:5,name:'BERSERKER',tag:'The Rage Machine',em:'💢',col:'#ff0033',story:'The further behind it gets, the faster it becomes.',aname:'BLOOD RAGE',adesc:'Speed scales with score deficit',diff:{spd:3.4,react:.58,ph:80},
-   ability(){const d=pscore-ascore;aiSt.speedMult=d>0?1+d*.28:1;if(d>=3&&frame%120===0)showAlert('💢 BERSERK!',opp.col);}},
-  {id:6,name:'SPECTER',tag:'The Invisible Hand',em:'🌫️',col:'#cccccc',story:'Phases between visible and invisible. Track the glow.',aname:'PHASE SHIFT',adesc:'Invisible for 1s every 3s',diff:{spd:4.5,react:.70,ph:80},
-   ability(){aiSt.invisible=(frame%180)<65;if(frame%180===0)showAlert('🌫️ PHASING...',opp.col);}},
-  {id:7,name:'ECHO',tag:'The Illusionist',em:'🎭',col:'#0088ff',story:'Spawns ghost balls to confuse. Only one is real.',aname:'GHOST BALL',adesc:'Spawns a decoy ball every 12s',diff:{spd:4.3,react:.68,ph:80},
-   ability(){if(frame>90&&frame%720===0&&ghosts.length<2){ghosts.push({x:ball.x,y:ball.y,vx:-ball.vx*.85+rand(-1.5,1.5),vy:ball.vy*.8+rand(-1.5,1.5),r:ball.r,life:350});showAlert('🎭 GHOST BALL!',opp.col);sfx.ab();}ghosts=ghosts.filter(g=>{g.x+=g.vx;g.y+=g.vy;if(g.y-g.r<0||g.y+g.r>H)g.vy*=-1;g.life--;return g.life>0&&g.x>-60&&g.x<W+60;});}},
-  {id:8,name:'BLACKOUT',tag:'The Darkness',em:'🌑',col:'#445566',story:'Plunges the arena into darkness for 2 seconds.',aname:'LIGHTS OUT',adesc:'Arena goes dark every 8 seconds',diff:{spd:4.1,react:.65,ph:80},
-   ability(){const ph=frame%480;aiSt.blackout=(ph>300&&ph<430);if(ph===300)showAlert('🌑 LIGHTS OUT!',opp.col);if(ph===430)showAlert('💡 LIGHTS ON','#ffffff');}},
+   ability(){if(frame>60&&frame%300===0){const s=Math.hypot(ball.vx,ball.vy);if(s<19){ball.vx*=1.18;ball.vy*=1.18;showAlert('⚡ SURGE!',opp.col);}}}},
+  {id:4,name:'PHANTOM',tag:'The Teleporter',em:'👻',col:'#bf5fff',story:'Teleports its paddle to meet the ball every 6 seconds.',aname:'GHOST STEP',adesc:'Teleports to intercept ball every 6 seconds',diff:{spd:3.8,react:.60,ph:80},
+   // Fixed: fire every 360 frames (~6s), whenever ball is moving (not just toward AI)
+   ability(){if(frame>120&&frame%360===0){ai.y=clamp(ball.y-ai.h/2,0,H-ai.h);burst(ai.x+ai.w/2,ai.y+ai.h/2,opp.col,22);sfx.tel();showAlert('👻 TELEPORT!',opp.col);flash(opp.col);}}},
+  {id:5,name:'BERSERKER',tag:'The Rage Machine',em:'💢',col:'#ff0033',story:'The further behind it gets, the faster it becomes.',aname:'BLOOD RAGE',adesc:'Speed surges per point of deficit — unstoppable when cornered',diff:{spd:3.4,react:.58,ph:80},
+   // Fixed: steeper multiplier, kicks in immediately at any deficit
+   ability(){const d=pscore-ascore;aiSt.speedMult=d>0?1+d*.45:1;if(d>=2&&frame%60===0)showAlert(`💢 BERSERK x${d}!`,opp.col);}},
+  {id:6,name:'SPECTER',tag:'The Invisible Hand',em:'🌫️',col:'#cccccc',story:'Phases between visible and invisible. Track the glow.',aname:'PHASE SHIFT',adesc:'Invisible for 2s every 4s — watch the ball direction',diff:{spd:4.5,react:.70,ph:80},
+   // Also hide the ball trail/glow when specter is invisible for extra challenge
+   ability(){const ph=frame%240;aiSt.invisible=(ph>0&&ph<120);if(ph===1)showAlert('🌫️ PHASING...',opp.col);if(ph===120)showAlert('👁 VISIBLE',opp.col);}},
+  {id:7,name:'ECHO',tag:'The Illusionist',em:'🎭',col:'#0088ff',story:'Spawns ghost balls to confuse. Only one is real.',aname:'GHOST BALL',adesc:'Spawns a decoy ball every 10s',diff:{spd:4.3,react:.68,ph:80},
+   ability(){if(frame>90&&frame%600===0&&ghosts.length<3){ghosts.push({x:ball.x,y:ball.y,vx:-ball.vx*.9+rand(-2,2),vy:ball.vy*.85+rand(-2,2),r:ball.r,life:350});showAlert('🎭 GHOST BALL!',opp.col);sfx.ab();}ghosts=ghosts.filter(g=>{g.x+=g.vx;g.y+=g.vy;if(g.y-g.r<0||g.y+g.r>H)g.vy*=-1;g.life--;return g.life>0&&g.x>-60&&g.x<W+60;});}},
+  {id:8,name:'BLACKOUT',tag:'The Darkness',em:'🌑',col:'#445566',story:'Plunges the arena into total darkness — ball becomes nearly invisible.',aname:'LIGHTS OUT',adesc:'Ball goes dark and nearly invisible for 4 seconds',diff:{spd:4.1,react:.65,ph:80},
+   // Fixed: also hide ball (set col to near-black) during blackout so it's actually hard
+   ability(){const ph=frame%480;const wasOut=aiSt.blackout;aiSt.blackout=(ph>260&&ph<460);if(aiSt.blackout&&!wasOut){ball.col='#111111';showAlert('🌑 LIGHTS OUT!',opp.col);}if(!aiSt.blackout&&wasOut){ball.col='#ffffff';showAlert('💡 LIGHTS ON','#ffffff');}}},
   {id:9,name:'MIRAGE',tag:'The Deceiver',em:'🌊',col:'#00ffaa',story:'Shows a phantom second paddle. Guess which is real.',aname:'DOUBLE VISION',adesc:'Displays a fake second paddle',diff:{spd:4.5,react:.70,ph:80},
    ability(){if(!aiSt.mirOff)aiSt.mirOff=90;if(frame%280===0){aiSt.mirOff=rand(-110,110);if(Math.abs(aiSt.mirOff)<30)aiSt.mirOff=90;}}},
-  {id:10,name:'REVERSO',tag:'The Curveball King',em:'🌀',col:'#ff44ff',story:'Imparts heavy topspin. Ball curves wildly toward you.',aname:'TOPSPIN',adesc:'Ball curves wildly after AI hits',diff:{spd:4.2,react:.66,ph:80},
-   ability(){if(aiSt.curveOn&&ball.vx<0){ball.vy+=aiSt.curveDy*.045;ball.vy=clamp(ball.vy,-16,16);}}},
-  {id:11,name:'OVERDRIVE',tag:'The Speed Demon',em:'🔴',col:'#ffdd00',story:'Double speed when defending. No easy shots.',aname:'TURBO REACTION',adesc:'2× AI speed when ball approaches',diff:{spd:4.2,react:.65,ph:78},ability(){aiSt.speedMult=ball.vx>0?2.1:.7;}},
+  {id:10,name:'REVERSO',tag:'The Curveball King',em:'🌀',col:'#ff44ff',story:'Imparts heavy topspin. Ball curves wildly toward you after AI hit.',aname:'TOPSPIN',adesc:'Ball curves hard toward you — only after AI returns',diff:{spd:4.2,react:.66,ph:80},
+   // Fixed: only curve when ball going toward player (vx<0) AND curveOn is set (AI hit it)
+   ability(){if(aiSt.curveOn&&ball.vx<0){ball.vy+=aiSt.curveDy*0.07;ball.vy=clamp(ball.vy,-18,18);}}},
+  {id:11,name:'OVERDRIVE',tag:'The Speed Demon',em:'🔴',col:'#ffdd00',story:'Double speed when defending. Hard to score, but you can exploit the pattern.',aname:'TURBO REACTION',adesc:'2× AI speed when ball approaches, slow when attacking',diff:{spd:4.2,react:.65,ph:78},
+   // Nerfed: 1.7× instead of 2.1×, and react penalty when attacking is harsher so you can beat it
+   ability(){aiSt.speedMult=ball.vx>0?1.7:.55;}},
   {id:12,name:'THE WALL',tag:'The Fortifier',em:'🧱',col:'#ff6622',story:'Deploys an energy barrier mid-court periodically.',aname:'ENERGY SHIELD',adesc:'Mid-court wall blocker appears',diff:{spd:4.0,react:.63,ph:82},
    ability(){const ph=frame%600;aiSt.wall=(ph>200&&ph<460);if(ph===200){showAlert('🧱 SHIELD UP!',opp.col);sfx.ab();}if(ph===460)showAlert('🧱 SHIELD DOWN','#ffffff44');}},
   {id:13,name:'VOID',tag:'The Corruptor',em:'🕳️',col:'#8800cc',story:'Your paddle slowly shrinks as time passes.',aname:'ENTROPY',adesc:'Player paddle shrinks every 5s',diff:{spd:4.9,react:.73,ph:80},
@@ -404,7 +413,7 @@ const h2r=h=>{const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=pa
 
 // ── MULTIPLAYER STATE ──
 let wsConn=null,mpRole=null,myRoom=null,mpOk=false;
-let guestY=H/2,hostState={bx:W/2,by:H/2,ps:0,as:0,hostY:H/2};
+let guestY=H/2,hostState={bx:W/2,by:H/2,bvx:0,bvy:0,ps:0,as:0,hostY:H/2};
 let stTmr=null,pdTmr=null,pgTmr=null,pingT=0,latency=0;
 let mySlots=[null,null],oppSlots=[null,null];
 let pFx={},oFx={};
@@ -433,7 +442,7 @@ function connectWS(){
 function disconnectWS(){if(wsConn){try{wsConn.close();}catch(e){}wsConn=null;}clearInterval(stTmr);clearInterval(pdTmr);clearInterval(pgTmr);mpRole=null;myRoom=null;mpOk=false;}
 function wsSend(d){if(wsConn&&wsConn.readyState===1)try{wsConn.send(JSON.stringify(d));}catch(e){}}
 function setPing(t,c){const el=document.getElementById('mp-ping');el.textContent=t;el.style.color=c;}
-function startPing(){stopPing();pgTmr=setInterval(()=>{pingT=Date.now();wsSend({type:'ping',t:pingT});},3000);}
+function startPing(){stopPing();pgTmr=setInterval(()=>{pingT=Date.now();wsSend({type:'ping',t:pingT});},1500);}
 function stopPing(){clearInterval(pgTmr);}
 
 function handleWS(msg){
@@ -455,7 +464,7 @@ function handleWS(msg){
       if(mpRole==='guest')hostState.hostY=msg.y;
       break;
     case 'state':
-      if(mpRole==='guest')Object.assign(hostState,{bx:msg.bx,by:msg.by,ps:msg.ps,as:msg.as});break;
+      if(mpRole==='guest')Object.assign(hostState,{bx:msg.bx,by:msg.by,bvx:msg.bvx||0,bvy:msg.bvy||0,ps:msg.ps,as:msg.as});break;
     case 'ability':applyFx(msg.id,msg.who);break;
     case 'gameover':if(mpRole==='guest')endGame(msg.winner==='guest');break;
     case 'taunt':showTaunt(msg.msg);break;
@@ -617,8 +626,28 @@ function beginGame(){
   running=true;paused=false;
   if(animId)cancelAnimationFrame(animId);
   if(mode==='multi'){
-    if(mpRole==='host')stTmr=setInterval(()=>{wsSend({type:'state',bx:ball.x,by:ball.y,bvx:ball.vx,bvy:ball.vy,ps:pscore,as:ascore});wsSend({type:'paddle',y:player.y});},33);
-    else pdTmr=setInterval(()=>wsSend({type:'paddle',y:player.y}),50);
+    // HOST: send authoritative ball state + paddle position every 20ms (~50fps net)
+    let _lastHostPaddleY=null;
+    if(mpRole==='host'){
+      stTmr=setInterval(()=>{
+        // Always send ball state
+        wsSend({type:'state',bx:ball.x,by:ball.y,bvx:ball.vx,bvy:ball.vy,ps:pscore,as:ascore});
+        // Only send paddle if it moved more than 1px
+        if(_lastHostPaddleY===null||Math.abs(player.y-_lastHostPaddleY)>1){
+          wsSend({type:'paddle',y:player.y});
+          _lastHostPaddleY=player.y;
+        }
+      },20);
+    } else {
+      // GUEST: send paddle every 16ms but only if moved >1px
+      let _lastGuestPaddleY=null;
+      pdTmr=setInterval(()=>{
+        if(_lastGuestPaddleY===null||Math.abs(player.y-_lastGuestPaddleY)>1){
+          wsSend({type:'paddle',y:player.y});
+          _lastGuestPaddleY=player.y;
+        }
+      },16);
+    }
   }
   loop();
 }
@@ -635,7 +664,7 @@ function resetGame(){
   updateSU();resetBall(Math.random()<.5?1:-1);
 }
 
-function resetBall(dir=1){ball.x=W/2;ball.y=rand(H*.25,H*.75);ball.trail=[];const b=opp?.diff?.spd>5?7.5:6.5;const a=rand(-.42,.42);ball.vx=Math.cos(a)*b*dir;ball.vy=Math.sin(a)*b;ball.col='#ffffff';aiSt.curveOn=false;aiSt.curveDy=0;scoreLock=false;}
+function resetBall(dir=1){ball.x=W/2;ball.y=rand(H*.25,H*.75);ball.trail=[];ball.col='#ffffff';const b=opp?.diff?.spd>5?7.5:6.5;const a=rand(-.42,.42);ball.vx=Math.cos(a)*b*dir;ball.vy=Math.sin(a)*b;aiSt.curveOn=false;aiSt.curveDy=0;scoreLock=false;}
 function stopGame(){running=false;if(animId){cancelAnimationFrame(animId);animId=null;}clearInterval(stTmr);clearInterval(pdTmr);}
 
 // ── ALERTS ──
@@ -672,13 +701,20 @@ function hits(p){return ball.x+ball.r>p.x&&ball.x-ball.r<p.x+p.w&&ball.y+ball.r>
 function bounce(p,isP){
   const rel=(ball.y-(p.y+p.h/2))/(p.h/2);
   let spd=Math.min(Math.hypot(ball.vx,ball.vy)*1.055,21);
+  spd=Math.max(spd,7); // never let speed drop below 7 so ball doesn't crawl
   if(isP&&pFx.overclock){spd*=2;delete pFx.overclock;showAlert('⚡ OVERCLOCK!','#ffd700');}
   if(!isP&&oFx.overclock){spd*=2;delete oFx.overclock;}
   const sm=(!isP&&aiSt.spinMult)?aiSt.spinMult:1;
-  const ang=rel*1.05*sm;
-  ball.vx=Math.cos(ang)*spd*(isP?1:-1);ball.vy=Math.sin(ang)*spd;
+  const maxAng=1.18; // ~68 deg max so vx always has enough force to cross arena
+  const ang=clamp(rel*0.9,-maxAng,maxAng);
+  ball.vx=Math.cos(ang)*spd*(isP?1:-1);
+  ball.vy=Math.sin(ang)*spd;
+  // VIPER: spin amplifies vy for a real nasty angle without killing vx
+  if(!isP&&sm>1){ball.vy=clamp(ball.vy*sm,-spd*0.95,spd*0.95);}
   ball.x=isP?p.x+p.w+ball.r+1:p.x-ball.r-1;
-  if(!isP){aiSt.curveOn=true;aiSt.curveDy=(Math.random()<.5?1:-1)*rand(.6,1.8);}
+  // REVERSO fix: curve only active when AI hit the ball; player hit cancels it
+  if(!isP){aiSt.curveOn=true;aiSt.curveDy=(Math.random()<.5?1:-1)*rand(1.2,2.4);}
+  else{aiSt.curveOn=false;}
   sfx.hit();burst(ball.x,ball.y,p.col,10);shake.mag=isMobile?1.5:3.5;
   const side=isP?'p':'a';
   if(lastHit&&lastHit!==side){combo++;lastHit=side;if(combo>2){document.getElementById('combo').textContent=`✦ ${combo}x COMBO`;sfx.combo(combo);}}else lastHit=side;
@@ -692,7 +728,12 @@ function update(){
   if(opp&&mode!=='multi')opp.ability();
   ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>(isMobile?6:14))ball.trail.shift();
   if(mode==='multi'&&mpRole==='guest'){
-    ball.x+=(hostState.bx-ball.x)*.3;ball.y+=(hostState.by-ball.y)*.3;
+    // Extrapolate using last known velocity, then lerp toward authority
+    if(hostState.bvx!==undefined){ball.x+=hostState.bvx;ball.y+=hostState.bvy;}
+    const dx=hostState.bx-ball.x,dy=hostState.by-ball.y;
+    const dist=Math.hypot(dx,dy);
+    const alpha=dist>20?0.5:0.1; // snap if drifted far, else smooth
+    ball.x+=dx*alpha;ball.y+=dy*alpha;
     if(hostState.ps!==undefined){pscore=hostState.ps;ascore=hostState.as;updateSU();}
     return;
   }
@@ -723,15 +764,16 @@ function draw(){
   if(flip){cx.translate(W,0);cx.scale(-1,1);}
   cx.fillStyle='#030712';cx.fillRect(-10,-10,W+20,H+20);
   if(aiSt.blackout){cx.fillStyle='rgba(0,0,0,.8)';cx.fillRect(-10,-10,W+20,H+20);}
-  if(!isMobile){cx.setLineDash([8,14]);cx.strokeStyle='rgba(255,255,255,.05)';cx.lineWidth=2;cx.beginPath();cx.moveTo(W/2,0);cx.lineTo(W/2,H);cx.stroke();cx.setLineDash([]);
-  cx.beginPath();cx.arc(W/2,H/2,50,0,Math.PI*2);cx.strokeStyle='rgba(255,255,255,.03)';cx.lineWidth=1.5;cx.stroke();}
+  cx.setLineDash([8,14]);cx.strokeStyle='rgba(255,255,255,.05)';cx.lineWidth=2;cx.beginPath();cx.moveTo(W/2,0);cx.lineTo(W/2,H);cx.stroke();cx.setLineDash([]);
+  cx.beginPath();cx.arc(W/2,H/2,50,0,Math.PI*2);cx.strokeStyle='rgba(255,255,255,.03)';cx.lineWidth=1.5;cx.stroke();
   cx.fillStyle='rgba(0,245,255,.07)';cx.fillRect(0,0,3,H*(pscore/WIN));
   cx.fillStyle='rgba(255,0,110,.07)';cx.fillRect(W-3,0,3,H*(ascore/WIN));
-  if(aiSt.wall){const wx=W*.67,wy=H*.22,ww=9,wh=H*.56;const wg=cx.createLinearGradient(wx,wy,wx,wy+wh);wg.addColorStop(0,'transparent');wg.addColorStop(.5,opp.col);wg.addColorStop(1,'transparent');cx.fillStyle=wg;cx.fillRect(wx,wy,ww,wh);if(!isMobile){cx.shadowColor=opp.col;cx.shadowBlur=14;}cx.strokeStyle=opp.col;cx.lineWidth=2;cx.strokeRect(wx,wy,ww,wh);cx.shadowBlur=0;}
+  if(aiSt.wall){const wx=W*.67,wy=H*.22,ww=9,wh=H*.56;const wg=cx.createLinearGradient(wx,wy,wx,wy+wh);wg.addColorStop(0,'transparent');wg.addColorStop(.5,opp.col);wg.addColorStop(1,'transparent');cx.fillStyle=wg;cx.fillRect(wx,wy,ww,wh);cx.shadowColor=opp.col;cx.shadowBlur=14;cx.strokeStyle=opp.col;cx.lineWidth=2;cx.strokeRect(wx,wy,ww,wh);cx.shadowBlur=0;}
   ghosts.forEach(g=>{const a=g.life/350*.7;cx.beginPath();cx.arc(g.x,g.y,g.r,0,Math.PI*2);cx.fillStyle=`rgba(0,136,255,${a*.5})`;cx.fill();cx.strokeStyle=`rgba(0,200,255,${a})`;cx.lineWidth=1.5;cx.stroke();});
-  if(!isMobile){ball.trail.forEach((t,i)=>{const a=(i/ball.trail.length)*.28,r=ball.r*(i/ball.trail.length)*.8;cx.beginPath();cx.arc(t.x,t.y,r,0,Math.PI*2);cx.fillStyle=`rgba(255,255,255,${a})`;cx.fill();});}
+  if(!aiSt.blackout){ball.trail.forEach((t,i)=>{const a=(i/ball.trail.length)*.28,r=ball.r*(i/ball.trail.length)*.8;cx.beginPath();cx.arc(t.x,t.y,r,0,Math.PI*2);cx.fillStyle=`rgba(255,255,255,${a})`;cx.fill();});}
   if(!aiSt.blackout||frame%6<3){if(!isMobile){const bg=cx.createRadialGradient(ball.x,ball.y,0,ball.x,ball.y,ball.r*3.5);bg.addColorStop(0,'rgba(255,255,255,.14)');bg.addColorStop(1,'transparent');cx.beginPath();cx.arc(ball.x,ball.y,ball.r*3.5,0,Math.PI*2);cx.fillStyle=bg;cx.fill();}}
-  cx.beginPath();cx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);cx.fillStyle=ball.col;if(!isMobile){cx.shadowColor=ball.col;cx.shadowBlur=20;}cx.fill();cx.shadowBlur=0;
+  // During blackout: draw ball dark (colour set in ability), no glow, no trail shown
+  cx.beginPath();cx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);cx.fillStyle=ball.col;if(!isMobile&&!aiSt.blackout){cx.shadowColor=ball.col;cx.shadowBlur=20;}cx.fill();cx.shadowBlur=0;
   // Player paddle
   const pg=pFx.ghost>0&&frame%28<14;
   cx.globalAlpha=pg?.18:1;if(!isMobile){cx.shadowColor=player.col;cx.shadowBlur=pg?0:22;}cx.fillStyle=player.col;cx.beginPath();cx.roundRect(player.x,player.y,player.w,player.h,4);cx.fill();if(!pg){cx.fillStyle='rgba(255,255,255,.4)';cx.fillRect(player.x,player.y+8,2,player.h-16);}cx.shadowBlur=0;cx.globalAlpha=1;
@@ -739,23 +781,24 @@ function draw(){
   const ag=oFx.ghost>0&&frame%28<14;
   if(!aiSt.invisible||frame%28<14){cx.globalAlpha=ag?.18:1;if(!isMobile){cx.shadowColor=ai.col;cx.shadowBlur=ag?0:22;}cx.fillStyle=ai.col;cx.beginPath();cx.roundRect(ai.x,ai.y,ai.w,ai.h,4);cx.fill();if(!ag){cx.fillStyle='rgba(255,255,255,.4)';cx.fillRect(ai.x+ai.w-2,ai.y+8,2,ai.h-16);}cx.shadowBlur=0;cx.globalAlpha=1;}
   // Mirage
-  if(opp?.id===9&&aiSt.mirOff){const fy=clamp(ai.y+aiSt.mirOff,0,H-ai.h);cx.globalAlpha=.3;if(!isMobile){cx.shadowColor=ai.col;cx.shadowBlur=12;}cx.fillStyle=ai.col;cx.beginPath();cx.roundRect(ai.x,fy,ai.w,ai.h,4);cx.fill();cx.shadowBlur=0;cx.globalAlpha=1;}
+  if(opp?.id===9&&aiSt.mirOff){const fy=clamp(ai.y+aiSt.mirOff,0,H-ai.h);cx.globalAlpha=.3;cx.shadowColor=ai.col;cx.shadowBlur=12;cx.fillStyle=ai.col;cx.beginPath();cx.roundRect(ai.x,fy,ai.w,ai.h,4);cx.fill();cx.shadowBlur=0;cx.globalAlpha=1;}
   // Freeze tint
   if(pFx.freeze>0){cx.fillStyle='rgba(136,204,255,.05)';cx.fillRect(0,0,W/2,H);}
   if(oFx.freeze>0){cx.fillStyle='rgba(136,204,255,.05)';cx.fillRect(W/2,0,W/2,H);}
   cx.restore();
-  // Particles — batched by color to avoid save/restore per particle on mobile
   px.clearRect(0,0,W,H);
-  if(isMobile){
-    parts.forEach(p=>{px.globalAlpha=p.life;px.fillStyle=p.col;px.beginPath();px.arc(p.x+shake.x,p.y+shake.y,p.r,0,Math.PI*2);px.fill();});
-    px.globalAlpha=1;
-  }else{
-    parts.forEach(p=>{px.save();px.globalAlpha=p.life;px.beginPath();px.arc(p.x+shake.x,p.y+shake.y,p.r,0,Math.PI*2);px.fillStyle=p.col;px.shadowColor=p.col;px.shadowBlur=8;px.fill();px.restore();});
-  }
+  parts.forEach(p=>{px.save();px.globalAlpha=p.life;px.beginPath();px.arc(p.x+shake.x,p.y+shake.y,p.r,0,Math.PI*2);px.fillStyle=p.col;if(!isMobile){px.shadowColor=p.col;px.shadowBlur=8;}px.fill();px.restore();});
 }
 
 // ── LOOP ──
-function loop(){if(!running||paused)return;update();draw();animId=requestAnimationFrame(loop);}
+let _lastFrame=0;
+const _targetMs=isMobile?20:0; // ~50fps cap on mobile, uncapped on desktop
+function loop(ts){
+  if(!running||paused)return;
+  if(isMobile&&ts-_lastFrame<_targetMs){animId=requestAnimationFrame(loop);return;}
+  _lastFrame=ts;
+  update();draw();animId=requestAnimationFrame(loop);
+}
 
 // ── END GAME ──
 function endGame(win){
